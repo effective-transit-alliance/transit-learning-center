@@ -25,7 +25,7 @@ While the proposed plan makes progress in this area, several lines' proposed sch
 Many trains deviate from a true clockface schedule by a few minutes, forcing riders to check the timetables so they do not miss their train.
 Schedules should be modified to create clockface schedules, for example, at 22 and 52 minutes per hour, wherever possible.
 
-```{image} ./ClockfaceSchedule.jpg
+```{figure} ClockfaceSchedule.jpg
 
 A clockface schedule from Japan showing consistent 20-minute frequency throughout the day[^clockface-schedule-image-original]
 ```
