@@ -1,6 +1,6 @@
 # Network Design Principles
 
-The service on the LIRR network should appeal to as many people for as many different types of trips as possible.
+The service on the New York regional rail network should appeal to as many people for as many different types of trips as possible.
 The offering needs to be predictable and easy to use.
 Trains must run frequently, defined here as headways no greater than 10 minutes wherever infrastructure allows, so that riders can just show up and go.
 
@@ -8,8 +8,8 @@ Trains must run frequently, defined here as headways no greater than 10 minutes 
 
 Emerging ridership trends show that ridership has recovered best on off-peak trains.
 With the future of five-day-a-week-in-office work very much in doubt, it is crucial that the LIRR broaden its conception of the riders and trips it serves.
-To do otherwise would both perform a disservice to Long Island residents and imperil the organization's own future.
-Moreover, the changes that the LIRR would have to make to its operating pattern would facilitate more straightforward crew scheduling.
+To do otherwise would both perform a disservice to greater New York residents and imperil the organization's own future.
+Moreover, the changes that the railroads would have to make to its operating pattern would facilitate more straightforward crew scheduling.
 Today's peak-heavy service requires many staff to work in the morning, rest during the midday, and come back on duty in the evening.
 This practice, known as a split shift, costs more per service hour than planning crews to work a continuous day.
 Added off-peak service would also amortize the capital costs of trains and infrastructure across more paying riders.
