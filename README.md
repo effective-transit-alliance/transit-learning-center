@@ -1,5 +1,7 @@
 # Transit Learning Center
 
+Work in progress!
+
 ## Rendering static website
 
 If you have installed [Nix](https://nixos.org/), you can just run
