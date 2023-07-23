@@ -12,8 +12,6 @@ Heavily work in progress!
    :maxdepth: 2
    :caption: Contents:
 
-   network design principles
-
 Indices and tables
 ==================
 
