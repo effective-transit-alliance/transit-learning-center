@@ -30,7 +30,7 @@ Schedules should be modified to create clockface schedules, for example, at 22 a
 A clockface schedule from Japan showing consistent 20-minute frequency throughout the day[^clockface-schedule-image-original]
 ```
 
-[^clockface-schedule-image-original]: https://commons.wikimedia.org/wiki/File:Himeji-monorail6.jpg
+[^clockface-schedule-image-original]: [https://commons.wikimedia.org/wiki/File:Himeji-monorail6.jpg](https://commons.wikimedia.org/wiki/File:Himeji-monorail6.jpg)
 
 ## Legible routes
 
