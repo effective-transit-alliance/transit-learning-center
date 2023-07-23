@@ -6,6 +6,8 @@ in pkgs.stdenv.mkDerivation {
 
   src = builtins.fetchGit ./.;
 
+  dontUnpack = true;
+
   nativeBuildInputs = [
     (pkgs.python3.withPackages (p: with p; [
       sphinx
@@ -14,9 +16,17 @@ in pkgs.stdenv.mkDerivation {
     ]))
   ];
 
-  buildFlags = "html";
+  dontConfigure = true;
 
-  installPhase = ''
-    mv build $out
+  preBuild = ''
+    cd "$src"
+    mkdir "$out"
   '';
+
+  buildFlags = [
+    "BUILDDIR=${builtins.placeholder "out"}"
+    "html"
+  ];
+
+  dontInstall = true;
 }
