@@ -2,7 +2,11 @@
 
 Work in progress!
 
-## Rendering static website
+## Viewing
+
+Go to https://transit-learning-center.readthedocs.io
+
+## Rendering static website locally
 
 If you have installed [Nix](https://nixos.org/), you can just run
 ```bash
