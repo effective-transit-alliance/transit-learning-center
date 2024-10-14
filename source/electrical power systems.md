@@ -10,7 +10,7 @@ Catenary wire is strung up over the tracks.
 
 Rolling stock which needs power is connected to the overhead wire with a *pantograph*.
 
-Modern overhead wire systems are typically at higher voltages AC, such as 25 kHz and 50 kHz.
+Modern overhead wire systems for mainline rail are typically at higher voltages AC, such as 25 kV.
 
 ## Third Rail
 
