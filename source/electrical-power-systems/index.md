@@ -12,6 +12,60 @@ Rolling stock which needs power is connected to the overhead wire with a *pantog
 
 Modern overhead wire systems for mainline rail are typically at higher voltages AC, such as 25 kV.
 
+### Catenary Tensioning System
+
+Catenary wire needs to be properly tensioned to function.
+This can be done in two ways: the simpler one is called *variable tension* or *fixed termination*;
+the other, more advanced one is called *constant tension* or *auto-tension*.
+Most of the catenary in the United States has variable tension.
+While variable tension systems are simpler to build, they can only operate within a specific temperature range, as metal expands in the heat and contracts in the cold;
+constant tension installations resolve this problem.
+Another problem of variable-tension catenary is that it limits trains to 135 mph in its most common configuration, with a few recently upgraded sections allowing slightly faster running.
+This limitation prevents pressure waves that moving trains create in variable tension wire from damaging the catenary or causing a train to lose power.
+
+Variable-tension catenary involves fixing wires to every support structure.
+The following figure, taken from [Garry Keenor’s Overhead Line Electrification for Railways 6th Edition](http://ocs4rail.com/), illustrates the view from the track side, with the bottom line representing the contact wire:
+
+![Diagram of constant tension catenary showing how it maintains tension through hot or cold temperatures.](./hot-cold.png)
+
+Between each anchor point, the wire sags in the heat and rises (hogs) in the cold.
+What’s more, metal catenary wire often ends up considerably hotter than the air.
+The resultant deformation increases the risk of pantographs felling wires or becoming damaged themselves, both of which require major repairs that stop service.
+In London, summer heat reaching about 90 °F in 2011 led the catenary wire to record 167 °F temperatures, [leading to train cancellations as the wire lost tension](https://www.railway-technology.com/features/featuretension-and-strain-on-overheated-trains/?cf-view).
+This episode led to the installation of constant-tension catenary, as shown in the figure below, taken from Keenor’s book as well:
+
+![Diagram showing sag and hog on variable tension catenary](./sag-hog.png)
+
+Constant-tension catenary only anchors each stretch of wire at its midpoint.
+The wire slides along all the other supports as it expands and contracts.
+Weights or spring tensioners at each end maintain the wire’s tension.
+Spring tensioners are usually preferable for lines with three or more tracks, as they avoid the need to run wires for one track across those of another to reach the side of the right-of-way, where weights are usually located.
+While constant tension catenary requires more complex engineering, the wire’s performance does not suffer in the heat or cold, and the maximum speed is therefore higher.
+Constant-tension catenary is not something at all unique to high-speed rail:
+[recent installations](https://www.nextlevelcommercial.com/docs/I-15.pdf) [have sold](https://www.mosdorfer.com/en/produkte/railway/) in countries with no trains faster than 125 mph.
+
+### Headspans, Gantries, and Cantilevers
+
+There are three ways to suspend catenary wire above track:
+*headspans*, *gantries* (also known as *portals*), and *cantilevers*.
+
+![Diagram of overhead gantry supporting catenary](./headspans.png)
+![Diagram of cantilever catenary support](./gantries.png)
+![Diagram of headspans supporting catenary](./cantilevers.png)
+
+Source: Kara Fischer, ETA
+
+Headspans and gantries differ in that headspans suspend the catenary from flexible wires, whereas gantries do so from fixed metal structures.
+Gantries have the ability to provide mechanical independence:
+if one track’s catenary wire fails, it doesn’t impact the other tracks’ power supply, and it’s possible to do maintenance on one track’s wire without disturbing the others.
+While simpler to install, than gantries or cantilevers, headspans can not furnish mechanical independence.
+They are not reliable enough for this reason.
+Cantilevers can be installed either to the side of tracks or between a pair of adjacent tracks, suspending wires above each on independent hangers;
+this provides mechanical independence, like gantries, at the cost of requiring more spacing between tracks than the other options.
+
+This [video](https://youtu.be/y7P__pLbmvk?si=0s-1fyOdReRYdIr2) from the Permanent Way Institution describes some of the various tradeoffs of the different styles of structures.
+British engineer Noel Dolphin [has written about a method of converting headspans to gantries](https://x.com/noeldolphin/status/1801338827983770032) that minimizes multi-track outages.
+
 ## Third Rail
 
 A "third rail" was originally just that, a third rail not used to support the train, but instead power it.
