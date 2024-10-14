@@ -12,7 +12,7 @@ Heavily work in progress!
    :maxdepth: 2
    :caption: Contents:
 
-   electrical power systems
+   electrical-power-systems
 
 Indices and tables
 ==================
