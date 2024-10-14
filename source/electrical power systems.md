@@ -24,9 +24,14 @@ Lower voltage but higher current roughly cancels out in terms of power (their pr
 ### Inferiority
 
 The physical power delivery mechanism itself are much more expensive for third rail.
-Third rails only last about [20 years](https://www.bart.gov/news/articles/2019/news20190731).
-Overhead wire itself and insulators, by contrast, typically lasts [over twice as long](https://www.sdtools.com/pdf/WCRR11_fatigue.pdf) as that, and the support poles often last even longer at over 100 years.
+Third rails only last about 20 years.[^third-rail-bart]
+Overhead wire itself and insulators, by contrast, typically lasts over twice as long as that[^overhead-wire-longevity],
+and the support poles often last even longer at over 100 years.
 Together, these costs and lifespans make the amortized costs of overhead wire construction and maintenance far lower.
+
+[^third-rail-bart]: <https://www.bart.gov/news/articles/2019/news20190731>
+
+[^overhead-wire-longevity]: <https://www.sdtools.com/pdf/WCRR11_fatigue.pdf>
 
 Third rail also requires the amount of supporting infrastructure needed.
 Because a third rail can only handle low voltages, each substation can only feed a few miles of track.
