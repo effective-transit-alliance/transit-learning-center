@@ -10,7 +10,7 @@ Catenary wire is strung up over the tracks.
 
 Rolling stock which needs power is connected to the overhead wire with a *pantograph*.
 
-Modern overhead wire wire systems are typically at higher voltages AC, such as 25 kHz and 50 kHz.
+Modern overhead wire systems are typically at higher voltages AC, such as 25 kHz and 50 kHz.
 
 ## Third Rail
 
@@ -23,7 +23,7 @@ Lower voltage but higher current roughly cancels out in terms of power (their pr
 
 ### Inferiority
 
-The physical power delivery mechanism itself are much more expensive for third wire.
+The physical power delivery mechanism itself are much more expensive for third rail.
 Third rails only last about [20 years](https://www.bart.gov/news/articles/2019/news20190731).
 Overhead wire itself and insulators, by contrast, typically lasts [over twice as long](https://www.sdtools.com/pdf/WCRR11_fatigue.pdf) as that, and the support poles often last even longer at over 100 years.
 Together, these costs and lifespans make the amortized costs of overhead wire construction and maintenance far lower.
