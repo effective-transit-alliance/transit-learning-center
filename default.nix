@@ -4,7 +4,17 @@ let
 in pkgs.stdenv.mkDerivation {
   name = "transit-learning-center";
 
-  src = builtins.fetchGit ./.;
+  src = let
+    inherit (pkgs.lib) fileset;
+  in fileset.toSource {
+    root = ./.;
+    fileset = fileset.intersection
+      (fileset.gitTracked ./.)
+      (fileset.unions [
+        ./Makefile
+        ./source
+      ]);
+  };
 
   dontUnpack = true;
 
