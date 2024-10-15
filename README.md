@@ -6,6 +6,13 @@ Work in progress!
 
 Go to https://transit-learning-center.readthedocs.io
 
+## Editting
+
+Content is written in [MyST] and rendered using [Sphinx].
+
+[MyST]: https://mystmd.org/
+[Sphinx]: https://www.sphinx-doc.org
+
 ## Rendering static website locally
 
 If you have installed [Nix](https://nixos.org/), you can just run
@@ -14,4 +21,4 @@ nix-build
 ```
 in a terminal.
 
-Otherwise, consult the [Sphinx](https://www.sphinx-doc.org/) documentation.
+Otherwise, consult the [Sphinx] documentation.
