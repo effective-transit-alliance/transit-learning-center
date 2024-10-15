@@ -3,19 +3,18 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Transit Learning Center
-=======================
+# Transit Learning Center
 
 Heavily work in progress!
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+```{toctree}
+:maxdepth: 2
+:caption: "Contents:"
 
-   electrical-power-systems/index
+electrical-power-systems/index
+```
 
-Indices and tables
-==================
+# Indices and tables
 
-* :ref:`genindex`
-* :ref:`search`
+* {ref}`genindex`
+* {ref}`search`
