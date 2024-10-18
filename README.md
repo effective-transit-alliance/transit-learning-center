@@ -6,7 +6,7 @@ Work in progress!
 
 Go to https://transit-learning-center.readthedocs.io
 
-## Editting
+## Editing
 
 Content is written in [MyST] and rendered using [Sphinx].
 
