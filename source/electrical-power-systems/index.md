@@ -1,6 +1,6 @@
 # Electrical Power Systems
 
-Electrical trains need to be powered.
+Electric trains need to be powered.
 In almost all cases, the best way to do this is not by having trains carry their own energy supply, as diesel and coal trains do, but to be connected to the electrical grid to receive externally-generated power continuously.
 Such power systems can be broken down into overhead and "third rail" systems.
 
@@ -10,7 +10,7 @@ Catenary wire is strung up over the tracks.
 
 Rolling stock which needs power is connected to the overhead wire with a *pantograph*.
 
-Modern overhead wire systems for mainline rail are typically at higher voltages AC, such as 25 kV.
+Modern overhead wire systems for mainline rail are typically use [AC](https://en.wikipedia.org/wiki/Alternating_current) and higher voltages, such as 25 kV.
 
 ## Third Rail
 
