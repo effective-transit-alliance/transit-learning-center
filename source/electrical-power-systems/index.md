@@ -1,16 +1,18 @@
 # Electrical Power Systems
 
-Electrical trains need to be powered.
-In almost all cases, the best way to do this is not by having trains carry their own energy supply, as diesel and coal trains do, but to be connected to the electrical grid to receive externally-generated power continuously.
-Such power systems can be broken down into overhead and "third rail" systems.
+Trains need to be powered.
+In most cases, for busy lines, they should be powered with electricity, not diesel (let alone other fossil fuels like coal).
+That still leaves leaves the question of where the electrical energy come from, however.
+In almost all cases, the best way to do this is not by having trains carry their own energy supply, as diesel and coal trains do, but by having them be connected to the electrical grid to receive externally-generated power continuously.
+Such power systems can be broken down into *overhead catenary* and *third rail* systems.
 
-## Overhead Catenary Wire
+## Overhead Catenary System (OCS)
 
-Catenary wire is strung up over the tracks.
+Overhead catenary wire is strung up over the tracks.
 
 Rolling stock which needs power is connected to the overhead wire with a *pantograph*.
 
-Modern overhead wire systems for mainline rail are typically at higher voltages AC, such as 25 kV.
+Modern overhead wire systems for mainline rail are typically use high-voltage [AC](https://en.wikipedia.org/wiki/Alternating_current), such as [25 kV AC which is the global standard](https://en.wikipedia.org/wiki/25_kV_AC_railway_electrification).
 
 ### Catenary Tensioning System
 
@@ -68,7 +70,7 @@ British engineer Noel Dolphin [has written about a method of converting headspan
 
 ## Third Rail
 
-A "third rail" was originally just that, a third rail not used to support the train, but instead power it.
+A "third rail" was originally just that, a third rail used not to support the train, but instead to power it.
 (Modern third rail has diverged in material and shape from regular rail, but the name has stuck.)
 
 The third rail is much thicker than a regular wire, and as such can carry higher currents.
@@ -77,7 +79,7 @@ Lower voltage but higher current roughly cancels out in terms of power (their pr
 
 ### Inferiority
 
-The physical power delivery mechanism itself are much more expensive for third rail.
+The physical power delivery mechanisms themselves are much more expensive for third rail.
 Third rails only last about 20 years.[^third-rail-bart]
 Overhead wire itself and insulators, by contrast, typically lasts over twice as long as that[^overhead-wire-longevity],
 and the support poles often last even longer at over 100 years.
