@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="900" height="640" style="background-color: var(--bg-color)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1175" width="900" height="1175" style="background-color: var(--bg-color)">
   <style>
     :root {
       --bg-color: white;
@@ -34,6 +34,13 @@
     .vertex { cursor: grab; touch-action: none; }
     .vertex:active { cursor: grabbing; }
   </style>
+
+  <defs>
+    <pattern id="crosshatch" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+      <rect x="0" y="0" width="7" height="14" fill="#0d9668" fill-opacity="0.3"/>
+      <rect x="7" y="0" width="7" height="14" fill="#2563eb" fill-opacity="0.3"/>
+    </pattern>
+  </defs>
 
   <script><![CDATA[
 @@SCRIPT@@

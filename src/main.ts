@@ -2,33 +2,55 @@ const svg = document.querySelector('svg')!;
 const ns = 'http://www.w3.org/2000/svg';
 
 // ============== Layout Constants ==============
+// Chart 1: Fare Structures (cost vs trips)
 const LEFT = 100, RIGHT = 850, TOP = 70, BOTTOM = 510;
 const WIDTH = RIGHT - LEFT;   // 750
 const HEIGHT = BOTTOM - TOP;  // 440
-const MAX_TRIPS = 70, MAX_COST = 210;
+const MAX_TRIPS = 100, MAX_COST = 300;
 const FARE = MAX_COST / MAX_TRIPS; // $3/trip (fixed slope)
-const MIN_TRIP_GAP = 3; // minimum trip gap between the two dots
+
+// Charts 2 & 3: Rider distributions (same height, generous space before titles)
+const DIST_HEIGHT = 180;
+const TITLE2_Y = 650, TOP2 = 672, BOTTOM2 = TOP2 + DIST_HEIGHT;
+const TITLE3_Y = 930, TOP3 = 952, BOTTOM3 = TOP3 + DIST_HEIGHT;
+
+// Distribution parameters
+const DIST_SIGMA = 0.8;       // log-normal shape (higher = more right-skew)
+const SIGMOID_K = 0.3;        // adoption/threshold steepness
+const TAIL_SLOWDOWN = 0.5;    // power exponent for tail decay past 0-marginal-cost threshold (lower = fatter tail)
+const DEMAND_BOOST = 0.5;     // max extra ridership from zero marginal cost fares (price elasticity)
 
 const COLORS = {
   perTrip:       '#94a3b8',
-  unlimited:     '#0d9668',
-  unlimitedDark: '#0a7c55',
-  fareCap:       '#2563eb',
-  fareCapDark:   '#1d4ed8',
+  unlimited:     '#2563eb',
+  unlimitedDark: '#1d4ed8',
+  fareCap:       '#0d9668',
+  fareCapDark:   '#0a7c55',
   agency:        '#e67e22',
   agencyDark:    '#b35c13',
+  dist:          '#475569',
 };
 
 // ============== Coordinate Transforms ==============
 function tx(trips: number): number { return LEFT + trips * WIDTH / MAX_TRIPS; }
 function ty(cost: number): number  { return BOTTOM - cost * HEIGHT / MAX_COST; }
 
-// Project a mouse position onto the per-trip diagonal, returning a trip count.
-// The diagonal goes from (LEFT, BOTTOM) to (RIGHT, TOP).
 function projectToTrips(mx: number, my: number): number {
   const dx = WIDTH, dy = -HEIGHT;
   const t = ((mx - LEFT) * dx + (my - BOTTOM) * dy) / (dx * dx + dy * dy);
   return Math.max(1, Math.min(MAX_TRIPS - 1, t * MAX_TRIPS));
+}
+
+// ============== Distribution Math ==============
+function riderPDF(x: number, mean: number): number {
+  if (x <= 0.5) return 0;
+  const mu = Math.log(mean) - DIST_SIGMA * DIST_SIGMA / 2;
+  return Math.exp(-0.5 * ((Math.log(x) - mu) / DIST_SIGMA) ** 2) /
+    (x * DIST_SIGMA * Math.sqrt(2 * Math.PI));
+}
+
+function sigmoid(x: number, center: number): number {
+  return 1 / (1 + Math.exp(-SIGMOID_K * (x - center)));
 }
 
 // ============== SVG Helpers ==============
@@ -134,95 +156,140 @@ function setVis(id: string, visible: boolean): void {
   document.getElementById(id)!.setAttribute('visibility', visible ? 'visible' : 'hidden');
 }
 
-// ============== Build Static Elements ==============
+// ============== Shared Distribution Chart Builder ==============
+// Charts 2 and 3 have identical structure: title, axes, stacked areas,
+// threshold guide, mode dot, and region labels.
+function buildDistChart(opts: {
+  prefix: string;
+  title: string;
+  titleY: number;
+  top: number;
+  bottom: number;
+  color: string;
+  colorDark: string;
+}): SVGGElement {
+  const g = document.createElementNS(ns, 'g');
+  const { prefix, titleY, top, bottom, color, colorDark } = opts;
 
-// Title and instructions
-svg.appendChild(createText(475, 30,
+  g.appendChild(createText(475, titleY, opts.title, { cls: 'title', anchor: 'middle' }));
+
+  // Axes
+  g.appendChild(createLine(LEFT, bottom, RIGHT + 10, bottom, { cls: 'axis', width: 1.8 }));
+  g.appendChild(createLine(LEFT, bottom, LEFT, top - 8, { cls: 'axis', width: 1.8 }));
+  g.appendChild(createArrow(RIGHT + 18, bottom, 'right'));
+  g.appendChild(createArrow(LEFT, top - 16, 'up'));
+
+  // Tick marks and labels
+  for (let t = 0; t <= MAX_TRIPS; t += 10) {
+    const x = tx(t);
+    g.appendChild(createLine(x, bottom, x, bottom + 7, { stroke: '#555', width: 1 }));
+    g.appendChild(createText(x, bottom + 20, String(t),
+      { cls: 'tick-label', anchor: 'middle' }));
+  }
+
+  // Stacked areas + curve
+  g.appendChild(createPolygon('0,0', { fill: COLORS.perTrip, opacity: 0.35, id: `${prefix}Grey` }));
+  g.appendChild(createPolygon('0,0', { fill: color, opacity: 0.35, id: `${prefix}Color` }));
+  g.appendChild(createPolyline('0,0', { stroke: COLORS.dist, width: 2, id: `${prefix}Curve` }));
+
+  // Threshold guide + mode dot (colored to match chart)
+  g.appendChild(createLine(0, top, 0, bottom,
+    { stroke: color, width: 1.2, dash: '3,4', id: `${prefix}Guide`, opacity: 0.7 }));
+  g.appendChild(createCircle(0, 0, 7,
+    { fill: color, stroke: 'white', sw: 2, id: `${prefix}MeanDot`, cls: 'vertex' }));
+
+  // Region labels
+  g.appendChild(createText(0, 0, '',
+    { cls: 'region-sub', fill: '#666', id: `${prefix}GreyLabel`, anchor: 'middle' }));
+  g.appendChild(createText(0, 0, '',
+    { cls: 'region-sub', fill: colorDark, id: `${prefix}ColorLabel`, anchor: 'middle' }));
+
+  return g;
+}
+
+// ============== Build Chart 1: Fare Structures ==============
+
+const chart1 = document.createElementNS(ns, 'g');
+
+chart1.appendChild(createText(475, 30,
   'Transit Fare Structures: Prepaid Unlimited vs. Fare Capping',
   { cls: 'title', anchor: 'middle' }));
-svg.appendChild(createText(475, 50,
-  'Drag the dots along the diagonal to explore different thresholds. Values are illustrative, not recommendations.',
+chart1.appendChild(createText(475, 50,
+  'Drag the dots to explore different thresholds and rider distributions. Values are illustrative, not recommendations.',
   { cls: 'subtitle', anchor: 'middle' }));
 
-// Grid lines
 for (let c = 30; c <= MAX_COST; c += 30) {
-  svg.appendChild(createLine(LEFT, ty(c), RIGHT, ty(c), { cls: 'grid', width: 0.7 }));
+  chart1.appendChild(createLine(LEFT, ty(c), RIGHT, ty(c), { cls: 'grid', width: 0.7 }));
 }
 
-// Axes
-svg.appendChild(createLine(LEFT, BOTTOM, RIGHT + 10, BOTTOM, { cls: 'axis', width: 1.8 }));
-svg.appendChild(createLine(LEFT, BOTTOM, LEFT, TOP - 8, { cls: 'axis', width: 1.8 }));
-svg.appendChild(createArrow(RIGHT + 18, BOTTOM, 'right'));
-svg.appendChild(createArrow(LEFT, TOP - 16, 'up'));
+chart1.appendChild(createLine(LEFT, BOTTOM, RIGHT + 10, BOTTOM, { cls: 'axis', width: 1.8 }));
+chart1.appendChild(createLine(LEFT, BOTTOM, LEFT, TOP - 8, { cls: 'axis', width: 1.8 }));
+chart1.appendChild(createArrow(RIGHT + 18, BOTTOM, 'right'));
+chart1.appendChild(createArrow(LEFT, TOP - 16, 'up'));
 
-// X-axis ticks and label
 for (let t = 0; t <= MAX_TRIPS; t += 10) {
   const x = tx(t);
-  svg.appendChild(createLine(x, BOTTOM, x, BOTTOM + 7, { stroke: '#555', width: 1 }));
-  svg.appendChild(createText(x, BOTTOM + 20, String(t), { cls: 'tick-label', anchor: 'middle' }));
+  chart1.appendChild(createLine(x, BOTTOM, x, BOTTOM + 7, { stroke: '#555', width: 1 }));
+  chart1.appendChild(createText(x, BOTTOM + 20, String(t), { cls: 'tick-label', anchor: 'middle' }));
 }
-svg.appendChild(createText((LEFT + RIGHT) / 2, BOTTOM + 45,
+chart1.appendChild(createText((LEFT + RIGHT) / 2, BOTTOM + 42,
   'Trips per Month', { cls: 'axis-label', anchor: 'middle' }));
 
-// Y-axis ticks and label
 for (let c = 0; c <= MAX_COST; c += 30) {
   const y = ty(c);
-  svg.appendChild(createLine(LEFT - 7, y, LEFT, y, { stroke: '#555', width: 1 }));
-  svg.appendChild(createText(LEFT - 12, y + 4, '$' + c, { cls: 'tick-label', anchor: 'end' }));
+  chart1.appendChild(createLine(LEFT - 7, y, LEFT, y, { stroke: '#555', width: 1 }));
+  chart1.appendChild(createText(LEFT - 12, y + 4, '$' + c, { cls: 'tick-label', anchor: 'end' }));
 }
 const yLabel = createText(0, 0, 'Total Cost', { cls: 'axis-label' });
 yLabel.setAttribute('transform', `translate(38,${(TOP + BOTTOM) / 2 + 30}) rotate(-90)`);
-svg.appendChild(yLabel);
+chart1.appendChild(yLabel);
 
-// ============== Dynamic Elements ==============
+// Chart 1 dynamic elements
+chart1.appendChild(createPolygon('0,0', { fill: COLORS.agency, opacity: 0.18, id: 'agencySurplus' }));
+chart1.appendChild(createPolygon('0,0', { fill: COLORS.unlimited, opacity: 0.18, id: 'unlimitedSurplus' }));
+const fcSurplus = document.createElementNS(ns, 'polygon');
+fcSurplus.setAttribute('points', '0,0');
+fcSurplus.setAttribute('fill', 'url(#crosshatch)');
+fcSurplus.setAttribute('stroke', 'none');
+fcSurplus.setAttribute('id', 'fareCapSurplus');
+chart1.appendChild(fcSurplus);
 
-// Surplus regions (drawn first = behind everything)
-svg.appendChild(createPolygon('0,0', { fill: COLORS.agency, opacity: 0.18, id: 'agencySurplus' }));
-svg.appendChild(createPolygon('0,0', { fill: COLORS.unlimited, opacity: 0.18, id: 'unlimitedSurplus' }));
-svg.appendChild(createPolygon('0,0', { fill: COLORS.fareCap, opacity: 0.22, id: 'fareCapSurplus' }));
-
-// Per-trip line (fixed slope)
-svg.appendChild(createLine(LEFT, BOTTOM, RIGHT, TOP,
+chart1.appendChild(createLine(LEFT, BOTTOM, RIGHT, TOP,
   { stroke: COLORS.perTrip, width: 2.2, dash: '7,5', id: 'perTripLine' }));
-
-// Unlimited pass line (horizontal, moves with break-even dot)
-svg.appendChild(createLine(LEFT, 0, RIGHT, 0,
+chart1.appendChild(createLine(LEFT, 0, RIGHT, 0,
   { stroke: COLORS.unlimited, width: 2.5, id: 'unlimitedLine' }));
-
-// Fare cap line (diagonal then horizontal, elbow at cap dot)
-svg.appendChild(createPolyline('0,0',
+chart1.appendChild(createPolyline('0,0',
   { stroke: COLORS.fareCap, width: 2.5, id: 'fareCapLine' }));
 
-// Vertical dashed guides
-svg.appendChild(createLine(0, 0, 0, 0,
+chart1.appendChild(createLine(0, 0, 0, 0,
   { stroke: COLORS.unlimited, width: 1, dash: '3,4', id: 'beGuide', opacity: 0.5 }));
-svg.appendChild(createLine(0, 0, 0, 0,
+chart1.appendChild(createLine(0, 0, 0, 0,
   { stroke: COLORS.fareCap, width: 1, dash: '3,4', id: 'capGuide', opacity: 0.5 }));
 
-// Draggable dots ON the diagonal (these are the handles)
-svg.appendChild(createCircle(0, 0, 7,
+chart1.appendChild(createCircle(0, 0, 7,
   { fill: COLORS.unlimited, stroke: 'white', sw: 2, id: 'beDot', cls: 'vertex' }));
-svg.appendChild(createCircle(0, 0, 7,
+chart1.appendChild(createCircle(0, 0, 7,
   { fill: COLORS.fareCap, stroke: 'white', sw: 2, id: 'capDot', cls: 'vertex' }));
 
-// Text labels (all positioned dynamically)
-svg.appendChild(createText(0, 0, '', { cls: 'region-label', fill: COLORS.agencyDark, id: 'agLabel', anchor: 'middle' }));
-svg.appendChild(createText(0, 0, '', { cls: 'region-label', fill: COLORS.unlimitedDark, id: 'ulLabel1', anchor: 'middle' }));
-svg.appendChild(createText(0, 0, '', { cls: 'region-sub', fill: COLORS.unlimitedDark, id: 'ulLabel2', anchor: 'middle' }));
-svg.appendChild(createText(0, 0, '', { cls: 'region-label', fill: COLORS.fareCapDark, id: 'fcLabel1', anchor: 'middle' }));
-svg.appendChild(createText(0, 0, '', { cls: 'region-sub', fill: COLORS.fareCapDark, id: 'fcLabel2', anchor: 'middle' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'region-label', fill: COLORS.agencyDark, id: 'agLabel', anchor: 'middle' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'region-label', id: 'stripLabel1', anchor: 'middle' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'region-sub', id: 'stripLabel2', anchor: 'middle' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'region-label', fill: COLORS.dist, id: 'ixLabel1', anchor: 'middle' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'region-sub', fill: COLORS.dist, id: 'ixLabel2', anchor: 'middle' }));
 
-svg.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.unlimitedDark, id: 'beAnno1', anchor: 'end' }));
-svg.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.unlimitedDark, id: 'beAnno2', anchor: 'end' }));
-svg.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.fareCapDark, id: 'capAnno1', anchor: 'start' }));
-svg.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.fareCapDark, id: 'capAnno2', anchor: 'start' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.unlimitedDark, id: 'beAnno1', anchor: 'end' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.unlimitedDark, id: 'beAnno2', anchor: 'end' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.fareCapDark, id: 'capAnno1', anchor: 'start' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.fareCapDark, id: 'capAnno2', anchor: 'start' }));
 
-svg.appendChild(createText(0, 0, '', { cls: 'value-label', fill: COLORS.unlimited, id: 'ulVal' }));
-svg.appendChild(createText(0, 0, '', { cls: 'value-label', fill: COLORS.fareCap, id: 'fcVal' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'value-label', fill: COLORS.unlimited, id: 'ulVal' }));
+chart1.appendChild(createText(0, 0, '', { cls: 'value-label', fill: COLORS.fareCap, id: 'fcVal' }));
 
-// Legend
+svg.appendChild(chart1);
+
+// ============== Legend ==============
 const lg = document.createElementNS(ns, 'g');
-lg.setAttribute('transform', 'translate(115,580)');
+lg.setAttribute('transform', 'translate(115,575)');
 
 const lgBg = document.createElementNS(ns, 'rect');
 lgBg.setAttribute('x', '-8'); lgBg.setAttribute('y', '-16');
@@ -238,127 +305,289 @@ lg.appendChild(createLine(455, 5, 482, 5, { stroke: COLORS.fareCap, width: 2.5 }
 lg.appendChild(createText(490, 9, '', { cls: 'legend-text', id: 'legFc' }));
 svg.appendChild(lg);
 
+// ============== Build Charts 2 & 3 ==============
+
+svg.appendChild(buildDistChart({
+  prefix: 'c2', title: 'With Fare Cap', titleY: TITLE2_Y,
+  top: TOP2, bottom: BOTTOM2,
+  color: COLORS.fareCap, colorDark: COLORS.fareCapDark,
+}));
+
+svg.appendChild(buildDistChart({
+  prefix: 'c3', title: 'With Unlimited Pass', titleY: TITLE3_Y,
+  top: TOP3, bottom: BOTTOM3,
+  color: COLORS.unlimited, colorDark: COLORS.unlimitedDark,
+}));
+
+// Shared Y-axis label spanning both distribution charts
+const passLabel = createText(0, 0, 'Passengers', { cls: 'axis-label' });
+passLabel.setAttribute('transform', `translate(50,${(TOP2 + BOTTOM3) / 2 + 30}) rotate(-90)`);
+svg.appendChild(passLabel);
+
 // ============== State ==============
-// Two trip-count values defining where the dots sit on the diagonal.
-// Invariant: 1 <= beTrips < capTrips <= MAX_TRIPS - 1
 const state = {
   beTrips: 30,   // break-even point (unlimited pass price = beTrips * FARE)
   capTrips: 50,  // cap point (fare cap amount = capTrips * FARE)
+  distMode: 12,  // mode (peak) of the base rider distribution
 };
 
-type DotKey = 'be' | 'cap';
+type DotKey = 'be' | 'cap' | 'mean';
 let dragging: DotKey | null = null;
 
 // ============== Core Update ==============
 function updateGraph(): void {
   const beTrips  = state.beTrips;
   const capTrips = state.capTrips;
-
   const unlimitedP = beTrips * FARE;
   const fareCapAmt = capTrips * FARE;
 
-  // Pixel positions of the two dots (on the diagonal)
   const beX = tx(beTrips),  beY = ty(unlimitedP);
   const capX = tx(capTrips), capY = ty(fareCapAmt);
 
-  // --- Lines ---
-  // Per-trip line is static (fixed slope), but set explicitly for clarity
+  // ---- Chart 1: Fare Structures ----
   setAttrs('perTripLine', { x1: LEFT, y1: BOTTOM, x2: RIGHT, y2: TOP });
-
-  // Unlimited pass: horizontal at the break-even dot's y
   setAttrs('unlimitedLine', { y1: beY, y2: beY });
-
-  // Fare cap: follows per-trip diagonal to cap dot, then horizontal
   document.getElementById('fareCapLine')!.setAttribute('points',
     `${LEFT},${BOTTOM} ${capX},${capY} ${RIGHT},${capY}`);
 
-  // --- Surplus regions ---
   document.getElementById('agencySurplus')!.setAttribute('points',
     `${LEFT},${beY} ${beX},${beY} ${LEFT},${BOTTOM}`);
-  document.getElementById('unlimitedSurplus')!.setAttribute('points',
-    `${beX},${beY} ${RIGHT},${TOP} ${RIGHT},${beY}`);
-  document.getElementById('fareCapSurplus')!.setAttribute('points',
-    `${capX},${capY} ${RIGHT},${TOP} ${RIGHT},${capY}`);
 
-  // --- Guides ---
+  // The two surplus triangles:
+  //   Unlimited: (beX,beY) → (RIGHT,TOP) → (RIGHT,beY)
+  //   Fare cap:  (capX,capY) → (RIGHT,TOP) → (RIGHT,capY)
+  // Cross-hatch = their intersection (the smaller/upper triangle).
+  // The non-overlapping strip is a trapezoid, colored by whichever
+  // policy has the lower threshold.
+  const upperX = Math.max(beX, capX), upperY = Math.min(beY, capY);
+  const lowerX = Math.min(beX, capX), lowerY = Math.max(beY, capY);
+  document.getElementById('fareCapSurplus')!.setAttribute('points',
+    `${upperX},${upperY} ${RIGHT},${TOP} ${RIGHT},${upperY}`);
+  document.getElementById('unlimitedSurplus')!.setAttribute('points',
+    `${lowerX},${lowerY} ${upperX},${upperY} ${RIGHT},${upperY} ${RIGHT},${lowerY}`);
+  document.getElementById('unlimitedSurplus')!.setAttribute('fill',
+    beTrips <= capTrips ? COLORS.unlimited : COLORS.fareCap);
+
   setAttrs('beGuide',  { x1: beX, x2: beX, y1: beY, y2: BOTTOM });
   setAttrs('capGuide', { x1: capX, x2: capX, y1: capY, y2: BOTTOM });
-
-  // --- Draggable dot positions ---
   setAttrs('beDot',  { cx: beX, cy: beY });
   setAttrs('capDot', { cx: capX, cy: capY });
 
-  // --- Value labels next to horizontal lines (right edge) ---
   setText('ulVal', '$' + Math.round(unlimitedP), RIGHT + 8, beY - 4);
   setText('fcVal', '$' + Math.round(fareCapAmt), RIGHT + 8, capY - 4);
 
-  // --- Region labels ---
-  // Agency surplus (orange triangle, left of break-even)
+  // Chart 1 region labels — use shared upper/lower geometry
   const agW = beX - LEFT;
   if (agW > 60) {
-    const cx = (LEFT * 2 + beX) / 3;
-    const cy = (beY * 2 + BOTTOM) / 3;
-    setText('agLabel', 'Agency surplus', cx, cy);
+    setText('agLabel', 'Agency surplus', (LEFT * 2 + beX) / 3, (beY * 2 + BOTTOM) / 3);
     setVis('agLabel', true);
-  } else {
-    setVis('agLabel', false);
-  }
+  } else { setVis('agLabel', false); }
 
-  // Unlimited rider surplus — in the strip between the two horizontal lines
-  const stripH = beY - capY;
-  if (stripH > 35 && RIGHT - beX > 100) {
-    const lx = beX + (RIGHT - beX) * 0.5;
-    const ly = (beY + capY) / 2;
-    setText('ulLabel1', 'Rider surplus', lx, ly - 5);
-    setText('ulLabel2', '(unlimited pass)', lx, ly + 10);
-    setVis('ulLabel1', true);
-    setVis('ulLabel2', true);
-  } else {
-    setVis('ulLabel1', false);
-    setVis('ulLabel2', false);
-  }
+  // Trapezoid (non-overlapping surplus for whichever policy has the lower threshold)
+  const stripH = lowerY - upperY;
+  const stripPolicy = beTrips <= capTrips ? 'unlimited pass' : 'fare cap';
+  const stripColor = beTrips <= capTrips ? COLORS.unlimitedDark : COLORS.fareCapDark;
+  if (stripH > 35 && RIGHT - lowerX > 100) {
+    const lx = lowerX + (RIGHT - lowerX) * 0.5, ly = (lowerY + upperY) / 2;
+    setText('stripLabel1', 'Rider surplus', lx, ly - 5);
+    setText('stripLabel2', `(${stripPolicy} only)`, lx, ly + 10);
+    document.getElementById('stripLabel1')!.setAttribute('fill', stripColor);
+    document.getElementById('stripLabel2')!.setAttribute('fill', stripColor);
+    setVis('stripLabel1', true); setVis('stripLabel2', true);
+  } else { setVis('stripLabel1', false); setVis('stripLabel2', false); }
 
-  // Fare cap rider surplus — inside the blue triangle
-  const blueW = RIGHT - capX;
-  const blueH = capY - TOP;
-  if (blueW > 100 && blueH > 40) {
-    const lx = (capX + RIGHT * 2) / 3;
-    const ly = (capY * 2 + TOP) / 3;
-    setText('fcLabel1', 'Rider surplus', lx, ly - 5);
-    setText('fcLabel2', '(fare cap & unlimited pass)', lx, ly + 10);
-    setVis('fcLabel1', true);
-    setVis('fcLabel2', true);
-  } else {
-    setVis('fcLabel1', false);
-    setVis('fcLabel2', false);
-  }
+  // Intersection triangle (cross-hatch — both policies provide surplus)
+  if (RIGHT - upperX > 100 && upperY - TOP > 40) {
+    const lx = (upperX + RIGHT * 2) / 3, ly = (upperY * 2 + TOP) / 3;
+    setText('ixLabel1', 'Rider surplus', lx, ly - 5);
+    setText('ixLabel2', '(fare cap & unlimited pass)', lx, ly + 10);
+    setVis('ixLabel1', true); setVis('ixLabel2', true);
+  } else { setVis('ixLabel1', false); setVis('ixLabel2', false); }
 
-  // --- Break-even annotation ---
   if (beX > LEFT + 40 && beX < RIGHT - 30) {
     setText('beAnno1', 'Break-even', beX - 8, beY - 12);
     setText('beAnno2', '(' + Math.round(beTrips) + ' trips)', beX - 8, beY);
-    setVis('beAnno1', true);
-    setVis('beAnno2', true);
-  } else {
-    setVis('beAnno1', false);
-    setVis('beAnno2', false);
-  }
+    setVis('beAnno1', true); setVis('beAnno2', true);
+  } else { setVis('beAnno1', false); setVis('beAnno2', false); }
 
-  // --- Cap-reached annotation ---
   if (capX > LEFT + 40 && capX < RIGHT - 30) {
     setText('capAnno1', 'Cap reached', capX + 8, capY - 12);
     setText('capAnno2', '(' + Math.round(capTrips) + ' trips)', capX + 8, capY);
-    setVis('capAnno1', true);
-    setVis('capAnno2', true);
-  } else {
-    setVis('capAnno1', false);
-    setVis('capAnno2', false);
-  }
+    setVis('capAnno1', true); setVis('capAnno2', true);
+  } else { setVis('capAnno1', false); setVis('capAnno2', false); }
 
-  // --- Legend text ---
   setText('legPt', `Pay-per-ride ($${FARE.toFixed(2)}/trip)`);
   setText('legUl', `Unlimited pass ($${Math.round(unlimitedP)}/mo)`);
   setText('legFc', `Fare cap ($${Math.round(fareCapAmt)}/mo)`);
+
+  // ---- Charts 2 & 3: Rider Distribution ----
+  //
+  // Key invariants:
+  //
+  // 1. Both fare-capped riders past the threshold and unlimited pass
+  //    holders (anywhere in the distribution) face 0 marginal cost, so
+  //    both must exhibit the same tail behavior — distribution is based
+  //    solely on the likelihood of desiring N trips, and not on cost.
+  //    The difference is only how riders enter the 0-marginal-cost regime:
+  //      - Fare cap: automatic hard cutoff at capTrips (not a choice).
+  //      - Unlimited pass: smooth sigmoid at beTrips (rider chooses to buy).
+  //
+  // 2. Lower thresholds of either policy mean Pareto-cheaper transit,
+  //    which attracts more total riders (price elasticity).
+  //
+  // 3. Monthly vs pay-per-ride is a choice. Riders will not exactly
+  //    transition around the break-even point, but will smoothly
+  //    transition because of uncertainty in advance about how many trips
+  //    will be taken.
+  //
+  // 4. Changing the fare cap slider should not affect pre-fare-cap rider
+  //    behavior, only post-fare-cap rider behavior.
+  //
+  // 5. Changing either policy slider should not affect the other
+  //    ridership graph.
+
+  const distMean = state.distMode * Math.exp(DIST_SIGMA * DIST_SIGMA);
+  const N = 300;
+  const step = MAX_TRIPS / N;
+
+  // Density at thresholds (for continuous kink model — 0 marginal cost → fatter tail)
+  const gAtCap = riderPDF(capTrips, distMean);
+  const gAtBe = riderPDF(beTrips, distMean);
+
+  // Lower thresholds → cheaper transit → more total riders (price elasticity)
+  const fcScale = 1 + DEMAND_BOOST * (1 - capTrips / MAX_TRIPS);
+  const ulScale = 1 + DEMAND_BOOST * (1 - beTrips / MAX_TRIPS);
+
+  const fcGrey: number[] = [];
+  const fcColor: number[] = [];
+  const ulGrey: number[] = [];
+  const ulColor: number[] = [];
+
+  let peakDensity = 0;
+
+  for (let i = 0; i <= N; i++) {
+    const t = i * step;
+    const g = riderPDF(t, distMean);
+
+    // Chart 2: Fare cap — hard color cutoff, continuous curve with kink.
+    // Below cap: grey (per-trip). Above cap: green (maxed out, 0 marginal cost).
+    // On the declining tail (g < gAtCap): power-law slowdown gAtCap × (g/gAtCap)^α
+    //   → continuous at capTrips, non-differentiable (kink), fatter than base.
+    // On the rising side (g >= gAtCap): just use base density g
+    //   → never suppress riders below the base distribution.
+    if (t <= capTrips) {
+      fcGrey.push(g * fcScale);
+      fcColor.push(0);
+    } else {
+      fcGrey.push(0);
+      if (gAtCap > 1e-10 && g < gAtCap) {
+        const ratio = g / gAtCap;
+        fcColor.push(gAtCap * Math.pow(ratio, TAIL_SLOWDOWN) * fcScale);
+      } else {
+        fcColor.push(g * fcScale);
+      }
+    }
+
+    // Chart 3: Unlimited pass — smooth sigmoid transition at beTrips.
+    // Pass holders face 0 marginal cost → same power-law tail slowdown as fare cap.
+    const pUl = sigmoid(t, beTrips);
+    ulGrey.push(g * (1 - pUl) * ulScale);
+    let gPassHolder = g;
+    if (t > beTrips && gAtBe > 1e-10 && g < gAtBe) {
+      const ratio = g / gAtBe;
+      gPassHolder = gAtBe * Math.pow(ratio, TAIL_SLOWDOWN);
+    }
+    ulColor.push(gPassHolder * pUl * ulScale);
+
+    peakDensity = Math.max(peakDensity,
+      fcGrey[i] + fcColor[i],
+      ulGrey[i] + ulColor[i]);
+  }
+
+  // Shared y-scale so both charts are directly comparable
+  const yScale = peakDensity > 0 ? DIST_HEIGHT * 0.85 / peakDensity : 1;
+
+  // Build stacked area polygons and total curve
+  function buildAreas(
+    grey: number[], color: number[], bottom: number,
+    greyId: string, colorId: string, curveId: string
+  ): void {
+    let greyPts = `${LEFT},${bottom}`;
+    for (let i = 0; i <= N; i++) {
+      greyPts += ` ${tx(i * step)},${bottom - grey[i] * yScale}`;
+    }
+    greyPts += ` ${RIGHT},${bottom}`;
+    document.getElementById(greyId)!.setAttribute('points', greyPts);
+
+    let colorPts = '';
+    for (let i = 0; i <= N; i++) {
+      colorPts += `${i > 0 ? ' ' : ''}${tx(i * step)},${bottom - grey[i] * yScale}`;
+    }
+    for (let i = N; i >= 0; i--) {
+      colorPts += ` ${tx(i * step)},${bottom - (grey[i] + color[i]) * yScale}`;
+    }
+    document.getElementById(colorId)!.setAttribute('points', colorPts);
+
+    let curvePts = '';
+    for (let i = 0; i <= N; i++) {
+      if (i > 0) curvePts += ' ';
+      curvePts += `${tx(i * step)},${bottom - (grey[i] + color[i]) * yScale}`;
+    }
+    document.getElementById(curveId)!.setAttribute('points', curvePts);
+  }
+
+  buildAreas(fcGrey, fcColor, BOTTOM2, 'c2Grey', 'c2Color', 'c2Curve');
+  buildAreas(ulGrey, ulColor, BOTTOM3, 'c3Grey', 'c3Color', 'c3Curve');
+
+  // Guides
+  setAttrs('c2Guide', { x1: capX, x2: capX });
+  setAttrs('c3Guide', { x1: beX, x2: beX });
+
+  // Mode dots — positioned at distMode on x-axis, on the total curve
+  const modeIdx = Math.round(state.distMode / step);
+  const clampedIdx = Math.max(0, Math.min(N, modeIdx));
+  setAttrs('c2MeanDot', {
+    cx: tx(state.distMode),
+    cy: BOTTOM2 - (fcGrey[clampedIdx] + fcColor[clampedIdx]) * yScale
+  });
+  setAttrs('c3MeanDot', {
+    cx: tx(state.distMode),
+    cy: BOTTOM3 - (ulGrey[clampedIdx] + ulColor[clampedIdx]) * yScale
+  });
+
+  // Region percentages
+  let fcGreyMass = 0, fcMass = 0;
+  let ulGreyMass = 0, ulMass = 0;
+  for (let i = 0; i <= N; i++) {
+    fcGreyMass += fcGrey[i];
+    fcMass += fcGrey[i] + fcColor[i];
+    ulGreyMass += ulGrey[i];
+    ulMass += ulGrey[i] + ulColor[i];
+  }
+  const fcGreyPct = fcMass > 0 ? Math.round(fcGreyMass / fcMass * 100) : 0;
+  const ulGreyPct = ulMass > 0 ? Math.round(ulGreyMass / ulMass * 100) : 0;
+
+  // Region labels — chart 2 (fare cap)
+  const c2LabelY = BOTTOM2 - 15;
+  if (capX - LEFT > 80) {
+    setText('c2GreyLabel', `${fcGreyPct}% per-trip`, (LEFT + capX) / 2, c2LabelY);
+    setVis('c2GreyLabel', true);
+  } else { setVis('c2GreyLabel', false); }
+  if (RIGHT - capX > 80) {
+    setText('c2ColorLabel', `${100 - fcGreyPct}% capped`, (capX + RIGHT) / 2, c2LabelY);
+    setVis('c2ColorLabel', true);
+  } else { setVis('c2ColorLabel', false); }
+
+  // Region labels — chart 3 (unlimited pass)
+  const c3LabelY = BOTTOM3 - 15;
+  if (beX - LEFT > 80) {
+    setText('c3GreyLabel', `${ulGreyPct}% per-trip`, (LEFT + beX) / 2, c3LabelY);
+    setVis('c3GreyLabel', true);
+  } else { setVis('c3GreyLabel', false); }
+  if (RIGHT - beX > 80) {
+    setText('c3ColorLabel', `${100 - ulGreyPct}% pass holders`, (beX + RIGHT) / 2, c3LabelY);
+    setVis('c3ColorLabel', true);
+  } else { setVis('c3ColorLabel', false); }
 }
 
 // ============== Drag Interaction ==============
@@ -382,31 +611,38 @@ function startDrag(key: DotKey): (evt: Event) => void {
   };
 }
 
-const beDotEl = document.getElementById('beDot') as unknown as SVGCircleElement;
-const capDotEl = document.getElementById('capDot') as unknown as SVGCircleElement;
+const beDotEl = document.getElementById('beDot')!;
+const capDotEl = document.getElementById('capDot')!;
+const c2MeanDotEl = document.getElementById('c2MeanDot')!;
+const c3MeanDotEl = document.getElementById('c3MeanDot')!;
 
 beDotEl.addEventListener('mousedown', startDrag('be'));
 beDotEl.addEventListener('touchstart', startDrag('be'), { passive: false });
 capDotEl.addEventListener('mousedown', startDrag('cap'));
 capDotEl.addEventListener('touchstart', startDrag('cap'), { passive: false });
+c2MeanDotEl.addEventListener('mousedown', startDrag('mean'));
+c2MeanDotEl.addEventListener('touchstart', startDrag('mean'), { passive: false });
+c3MeanDotEl.addEventListener('mousedown', startDrag('mean'));
+c3MeanDotEl.addEventListener('touchstart', startDrag('mean'), { passive: false });
 
 function onMove(evt: MouseEvent | TouchEvent): void {
   if (!dragging) return;
   evt.preventDefault();
   const pos = getPos(evt);
 
-  // Project mouse position onto the diagonal to get trip count
-  const trips = projectToTrips(pos.x, pos.y);
-
-  if (dragging === 'be') {
-    state.beTrips = Math.min(trips, state.capTrips - MIN_TRIP_GAP);
-  } else {
-    state.capTrips = Math.max(trips, state.beTrips + MIN_TRIP_GAP);
+  if (dragging === 'be' || dragging === 'cap') {
+    const trips = projectToTrips(pos.x, pos.y);
+    if (dragging === 'be') {
+      state.beTrips = trips;
+    } else {
+      state.capTrips = trips;
+    }
+    state.beTrips = Math.max(1, Math.min(MAX_TRIPS - 1, state.beTrips));
+    state.capTrips = Math.max(1, Math.min(MAX_TRIPS - 1, state.capTrips));
+  } else if (dragging === 'mean') {
+    const trips = ((pos.x - LEFT) / WIDTH) * MAX_TRIPS;
+    state.distMode = Math.max(2, Math.min(MAX_TRIPS * 0.7, trips));
   }
-
-  // Clamp to valid range
-  state.beTrips = Math.max(1, Math.min(MAX_TRIPS - MIN_TRIP_GAP - 1, state.beTrips));
-  state.capTrips = Math.max(state.beTrips + MIN_TRIP_GAP, Math.min(MAX_TRIPS - 1, state.capTrips));
 
   updateGraph();
 }
