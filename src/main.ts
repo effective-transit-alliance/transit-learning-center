@@ -6,7 +6,8 @@ const LEFT = 100, RIGHT = 850, TOP = 70, BOTTOM = 510;
 const WIDTH = RIGHT - LEFT;   // 750
 const HEIGHT = BOTTOM - TOP;  // 440
 const MAX_TRIPS = 70, MAX_COST = 210;
-const MIN_GAP = 15; // minimum pixel gap between draggable vertices
+const FARE = MAX_COST / MAX_TRIPS; // $3/trip (fixed slope)
+const MIN_TRIP_GAP = 3; // minimum trip gap between the two dots
 
 const COLORS = {
   perTrip:       '#94a3b8',
@@ -21,7 +22,14 @@ const COLORS = {
 // ============== Coordinate Transforms ==============
 function tx(trips: number): number { return LEFT + trips * WIDTH / MAX_TRIPS; }
 function ty(cost: number): number  { return BOTTOM - cost * HEIGHT / MAX_COST; }
-function costFromY(y: number): number { return (BOTTOM - y) * MAX_COST / HEIGHT; }
+
+// Project a mouse position onto the per-trip diagonal, returning a trip count.
+// The diagonal goes from (LEFT, BOTTOM) to (RIGHT, TOP).
+function projectToTrips(mx: number, my: number): number {
+  const dx = WIDTH, dy = -HEIGHT;
+  const t = ((mx - LEFT) * dx + (my - BOTTOM) * dy) / (dx * dx + dy * dy);
+  return Math.max(1, Math.min(MAX_TRIPS - 1, t * MAX_TRIPS));
+}
 
 // ============== SVG Helpers ==============
 function createLine(
@@ -133,7 +141,7 @@ svg.appendChild(createText(475, 30,
   'Transit Fare Structures: Prepaid Unlimited vs. Fare Capping',
   { cls: 'title', anchor: 'middle' }));
 svg.appendChild(createText(475, 50,
-  'Drag the colored dots on the right edge to explore different scenarios. Values are illustrative, not recommendations.',
+  'Drag the dots along the diagonal to explore different thresholds. Values are illustrative, not recommendations.',
   { cls: 'subtitle', anchor: 'middle' }));
 
 // Grid lines
@@ -173,33 +181,29 @@ svg.appendChild(createPolygon('0,0', { fill: COLORS.agency, opacity: 0.18, id: '
 svg.appendChild(createPolygon('0,0', { fill: COLORS.unlimited, opacity: 0.18, id: 'unlimitedSurplus' }));
 svg.appendChild(createPolygon('0,0', { fill: COLORS.fareCap, opacity: 0.22, id: 'fareCapSurplus' }));
 
-// Cost lines
+// Per-trip line (fixed slope)
 svg.appendChild(createLine(LEFT, BOTTOM, RIGHT, TOP,
   { stroke: COLORS.perTrip, width: 2.2, dash: '7,5', id: 'perTripLine' }));
+
+// Unlimited pass line (horizontal, moves with break-even dot)
 svg.appendChild(createLine(LEFT, 0, RIGHT, 0,
   { stroke: COLORS.unlimited, width: 2.5, id: 'unlimitedLine' }));
+
+// Fare cap line (diagonal then horizontal, elbow at cap dot)
 svg.appendChild(createPolyline('0,0',
   { stroke: COLORS.fareCap, width: 2.5, id: 'fareCapLine' }));
 
-// Vertical dashed guides at break-even and cap points
+// Vertical dashed guides
 svg.appendChild(createLine(0, 0, 0, 0,
   { stroke: COLORS.unlimited, width: 1, dash: '3,4', id: 'beGuide', opacity: 0.5 }));
 svg.appendChild(createLine(0, 0, 0, 0,
   { stroke: COLORS.fareCap, width: 1, dash: '3,4', id: 'capGuide', opacity: 0.5 }));
 
-// Intersection dots
-svg.appendChild(createCircle(0, 0, 4.5,
-  { fill: COLORS.unlimited, stroke: 'white', sw: 1.5, id: 'beDot' }));
-svg.appendChild(createCircle(0, 0, 4.5,
-  { fill: COLORS.fareCap, stroke: 'white', sw: 1.5, id: 'capDot' }));
-
-// Draggable vertices on the right edge
-svg.appendChild(createCircle(RIGHT, 0, 8,
-  { fill: COLORS.perTrip, stroke: 'white', sw: 2, id: 'ptVtx', cls: 'vertex' }));
-svg.appendChild(createCircle(RIGHT, 0, 8,
-  { fill: COLORS.fareCap, stroke: 'white', sw: 2, id: 'fcVtx', cls: 'vertex' }));
-svg.appendChild(createCircle(RIGHT, 0, 8,
-  { fill: COLORS.unlimited, stroke: 'white', sw: 2, id: 'ulVtx', cls: 'vertex' }));
+// Draggable dots ON the diagonal (these are the handles)
+svg.appendChild(createCircle(0, 0, 7,
+  { fill: COLORS.unlimited, stroke: 'white', sw: 2, id: 'beDot', cls: 'vertex' }));
+svg.appendChild(createCircle(0, 0, 7,
+  { fill: COLORS.fareCap, stroke: 'white', sw: 2, id: 'capDot', cls: 'vertex' }));
 
 // Text labels (all positioned dynamically)
 svg.appendChild(createText(0, 0, '', { cls: 'region-label', fill: COLORS.agencyDark, id: 'agLabel', anchor: 'middle' }));
@@ -213,7 +217,6 @@ svg.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.unlimited
 svg.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.fareCapDark, id: 'capAnno1', anchor: 'start' }));
 svg.appendChild(createText(0, 0, '', { cls: 'annotation', fill: COLORS.fareCapDark, id: 'capAnno2', anchor: 'start' }));
 
-svg.appendChild(createText(0, 0, '', { cls: 'value-label', fill: COLORS.perTrip, id: 'ptVal' }));
 svg.appendChild(createText(0, 0, '', { cls: 'value-label', fill: COLORS.unlimited, id: 'ulVal' }));
 svg.appendChild(createText(0, 0, '', { cls: 'value-label', fill: COLORS.fareCap, id: 'fcVal' }));
 
@@ -235,86 +238,77 @@ lg.appendChild(createLine(455, 5, 482, 5, { stroke: COLORS.fareCap, width: 2.5 }
 lg.appendChild(createText(490, 9, '', { cls: 'legend-text', id: 'legFc' }));
 svg.appendChild(lg);
 
-// ============== Vertex State ==============
-// In pixel-y: lower y = higher cost.
-// Ordering invariant: perTrip.y < fareCap.y < unlimited.y
-//   (total at 70 trips > fare cap > unlimited price)
-interface VertexState { el: SVGCircleElement; y: number; }
-
-const verts = {
-  perTrip:   { el: document.getElementById('ptVtx') as unknown as SVGCircleElement, y: ty(210) },
-  fareCap:   { el: document.getElementById('fcVtx') as unknown as SVGCircleElement, y: ty(150) },
-  unlimited: { el: document.getElementById('ulVtx') as unknown as SVGCircleElement, y: ty(90) },
+// ============== State ==============
+// Two trip-count values defining where the dots sit on the diagonal.
+// Invariant: 1 <= beTrips < capTrips <= MAX_TRIPS - 1
+const state = {
+  beTrips: 30,   // break-even point (unlimited pass price = beTrips * FARE)
+  capTrips: 50,  // cap point (fare cap amount = capTrips * FARE)
 };
 
-type VertKey = keyof typeof verts;
-let dragging: VertKey | null = null;
+type DotKey = 'be' | 'cap';
+let dragging: DotKey | null = null;
 
 // ============== Core Update ==============
 function updateGraph(): void {
-  const ptY = verts.perTrip.y;
-  const fcY = verts.fareCap.y;
-  const ulY = verts.unlimited.y;
+  const beTrips  = state.beTrips;
+  const capTrips = state.capTrips;
 
-  // Derive dollar values
-  const totalAt70   = costFromY(ptY);
-  const perTripFare = totalAt70 / MAX_TRIPS;
-  const fareCapAmt  = costFromY(fcY);
-  const unlimitedP  = costFromY(ulY);
+  const unlimitedP = beTrips * FARE;
+  const fareCapAmt = capTrips * FARE;
 
-  // Derived trip counts
-  const beTrips  = perTripFare > 0 ? unlimitedP / perTripFare : MAX_TRIPS;
-  const capTrips = perTripFare > 0 ? fareCapAmt / perTripFare : MAX_TRIPS;
-  const beX  = tx(beTrips);
-  const capX = tx(capTrips);
+  // Pixel positions of the two dots (on the diagonal)
+  const beX = tx(beTrips),  beY = ty(unlimitedP);
+  const capX = tx(capTrips), capY = ty(fareCapAmt);
 
   // --- Lines ---
-  setAttrs('perTripLine', { x2: RIGHT, y2: ptY });
-  setAttrs('unlimitedLine', { y1: ulY, y2: ulY });
+  // Per-trip line is static (fixed slope), but set explicitly for clarity
+  setAttrs('perTripLine', { x1: LEFT, y1: BOTTOM, x2: RIGHT, y2: TOP });
+
+  // Unlimited pass: horizontal at the break-even dot's y
+  setAttrs('unlimitedLine', { y1: beY, y2: beY });
+
+  // Fare cap: follows per-trip diagonal to cap dot, then horizontal
   document.getElementById('fareCapLine')!.setAttribute('points',
-    `${LEFT},${BOTTOM} ${capX},${fcY} ${RIGHT},${fcY}`);
+    `${LEFT},${BOTTOM} ${capX},${capY} ${RIGHT},${capY}`);
 
   // --- Surplus regions ---
   document.getElementById('agencySurplus')!.setAttribute('points',
-    `${LEFT},${ulY} ${beX},${ulY} ${LEFT},${BOTTOM}`);
+    `${LEFT},${beY} ${beX},${beY} ${LEFT},${BOTTOM}`);
   document.getElementById('unlimitedSurplus')!.setAttribute('points',
-    `${beX},${ulY} ${RIGHT},${ptY} ${RIGHT},${ulY}`);
+    `${beX},${beY} ${RIGHT},${TOP} ${RIGHT},${beY}`);
   document.getElementById('fareCapSurplus')!.setAttribute('points',
-    `${capX},${fcY} ${RIGHT},${ptY} ${RIGHT},${fcY}`);
+    `${capX},${capY} ${RIGHT},${TOP} ${RIGHT},${capY}`);
 
-  // --- Guides and dots ---
-  setAttrs('beGuide',  { x1: beX, x2: beX, y1: ulY, y2: BOTTOM });
-  setAttrs('capGuide', { x1: capX, x2: capX, y1: fcY, y2: BOTTOM });
-  setAttrs('beDot',  { cx: beX, cy: ulY });
-  setAttrs('capDot', { cx: capX, cy: fcY });
+  // --- Guides ---
+  setAttrs('beGuide',  { x1: beX, x2: beX, y1: beY, y2: BOTTOM });
+  setAttrs('capGuide', { x1: capX, x2: capX, y1: capY, y2: BOTTOM });
 
-  // --- Vertex positions ---
-  verts.perTrip.el.setAttribute('cy', String(ptY));
-  verts.fareCap.el.setAttribute('cy', String(fcY));
-  verts.unlimited.el.setAttribute('cy', String(ulY));
+  // --- Draggable dot positions ---
+  setAttrs('beDot',  { cx: beX, cy: beY });
+  setAttrs('capDot', { cx: capX, cy: capY });
 
-  // --- Right-edge value labels ---
-  setText('ptVal', '$' + Math.round(totalAt70), RIGHT + 12, ptY + 4);
-  setText('fcVal', '$' + Math.round(fareCapAmt), RIGHT + 12, fcY + 4);
-  setText('ulVal', '$' + Math.round(unlimitedP), RIGHT + 12, ulY + 4);
+  // --- Value labels next to horizontal lines (right edge) ---
+  setText('ulVal', '$' + Math.round(unlimitedP), RIGHT + 8, beY - 4);
+  setText('fcVal', '$' + Math.round(fareCapAmt), RIGHT + 8, capY - 4);
 
   // --- Region labels ---
   // Agency surplus (orange triangle, left of break-even)
   const agW = beX - LEFT;
   if (agW > 60) {
     const cx = (LEFT * 2 + beX) / 3;
-    const cy = (ulY * 2 + BOTTOM) / 3;
+    const cy = (beY * 2 + BOTTOM) / 3;
     setText('agLabel', 'Agency surplus', cx, cy);
     setVis('agLabel', true);
   } else {
     setVis('agLabel', false);
   }
 
-  // Unlimited rider surplus — place in the strip between the two horizontal lines
-  const stripH = ulY - fcY;
+  // Unlimited rider surplus — in the strip between the two horizontal lines
+  const stripH = beY - capY;
   if (stripH > 35 && RIGHT - beX > 100) {
     const lx = beX + (RIGHT - beX) * 0.5;
-    const ly = (ulY + fcY) / 2;
+    const ly = (beY + capY) / 2;
     setText('ulLabel1', 'Rider surplus', lx, ly - 5);
     setText('ulLabel2', '(unlimited pass)', lx, ly + 10);
     setVis('ulLabel1', true);
@@ -326,10 +320,10 @@ function updateGraph(): void {
 
   // Fare cap rider surplus — inside the blue triangle
   const blueW = RIGHT - capX;
-  const blueH = fcY - ptY;
+  const blueH = capY - TOP;
   if (blueW > 100 && blueH > 40) {
     const lx = (capX + RIGHT * 2) / 3;
-    const ly = (fcY * 2 + ptY) / 3;
+    const ly = (capY * 2 + TOP) / 3;
     setText('fcLabel1', 'Rider surplus', lx, ly - 5);
     setText('fcLabel2', '(fare cap & unlimited pass)', lx, ly + 10);
     setVis('fcLabel1', true);
@@ -341,8 +335,8 @@ function updateGraph(): void {
 
   // --- Break-even annotation ---
   if (beX > LEFT + 40 && beX < RIGHT - 30) {
-    setText('beAnno1', 'Break-even', beX - 8, ulY - 12);
-    setText('beAnno2', '(' + Math.round(beTrips) + ' trips)', beX - 8, ulY);
+    setText('beAnno1', 'Break-even', beX - 8, beY - 12);
+    setText('beAnno2', '(' + Math.round(beTrips) + ' trips)', beX - 8, beY);
     setVis('beAnno1', true);
     setVis('beAnno2', true);
   } else {
@@ -352,8 +346,8 @@ function updateGraph(): void {
 
   // --- Cap-reached annotation ---
   if (capX > LEFT + 40 && capX < RIGHT - 30) {
-    setText('capAnno1', 'Cap reached', capX + 8, fcY - 12);
-    setText('capAnno2', '(' + Math.round(capTrips) + ' trips)', capX + 8, fcY);
+    setText('capAnno1', 'Cap reached', capX + 8, capY - 12);
+    setText('capAnno2', '(' + Math.round(capTrips) + ' trips)', capX + 8, capY);
     setVis('capAnno1', true);
     setVis('capAnno2', true);
   } else {
@@ -362,7 +356,7 @@ function updateGraph(): void {
   }
 
   // --- Legend text ---
-  setText('legPt', `Pay-per-ride ($${perTripFare.toFixed(2)}/trip)`);
+  setText('legPt', `Pay-per-ride ($${FARE.toFixed(2)}/trip)`);
   setText('legUl', `Unlimited pass ($${Math.round(unlimitedP)}/mo)`);
   setText('legFc', `Fare cap ($${Math.round(fareCapAmt)}/mo)`);
 }
@@ -381,47 +375,38 @@ function getPos(evt: MouseEvent | TouchEvent): { x: number; y: number } {
   return { x: (cx - CTM.e) / CTM.a, y: (cy - CTM.f) / CTM.d };
 }
 
-function startDrag(key: VertKey): (evt: Event) => void {
+function startDrag(key: DotKey): (evt: Event) => void {
   return (evt: Event) => {
     dragging = key;
     evt.preventDefault();
   };
 }
 
-for (const key of ['perTrip', 'fareCap', 'unlimited'] as VertKey[]) {
-  verts[key].el.addEventListener('mousedown', startDrag(key));
-  verts[key].el.addEventListener('touchstart', startDrag(key), { passive: false });
-}
+const beDotEl = document.getElementById('beDot') as unknown as SVGCircleElement;
+const capDotEl = document.getElementById('capDot') as unknown as SVGCircleElement;
+
+beDotEl.addEventListener('mousedown', startDrag('be'));
+beDotEl.addEventListener('touchstart', startDrag('be'), { passive: false });
+capDotEl.addEventListener('mousedown', startDrag('cap'));
+capDotEl.addEventListener('touchstart', startDrag('cap'), { passive: false });
 
 function onMove(evt: MouseEvent | TouchEvent): void {
   if (!dragging) return;
   evt.preventDefault();
   const pos = getPos(evt);
 
-  // Update dragged vertex (x is locked to RIGHT)
-  verts[dragging].y = Math.max(TOP + 5, Math.min(BOTTOM - 5, pos.y));
+  // Project mouse position onto the diagonal to get trip count
+  const trips = projectToTrips(pos.x, pos.y);
 
-  // Enforce ordering: perTrip.y < fareCap.y < unlimited.y
-  if (dragging === 'perTrip') {
-    if (verts.perTrip.y + MIN_GAP > verts.fareCap.y)
-      verts.fareCap.y = verts.perTrip.y + MIN_GAP;
-    if (verts.fareCap.y + MIN_GAP > verts.unlimited.y)
-      verts.unlimited.y = verts.fareCap.y + MIN_GAP;
-  } else if (dragging === 'unlimited') {
-    if (verts.unlimited.y - MIN_GAP < verts.fareCap.y)
-      verts.fareCap.y = verts.unlimited.y - MIN_GAP;
-    if (verts.fareCap.y - MIN_GAP < verts.perTrip.y)
-      verts.perTrip.y = verts.fareCap.y - MIN_GAP;
+  if (dragging === 'be') {
+    state.beTrips = Math.min(trips, state.capTrips - MIN_TRIP_GAP);
   } else {
-    if (verts.fareCap.y - MIN_GAP < verts.perTrip.y)
-      verts.perTrip.y = verts.fareCap.y - MIN_GAP;
-    if (verts.fareCap.y + MIN_GAP > verts.unlimited.y)
-      verts.unlimited.y = verts.fareCap.y + MIN_GAP;
+    state.capTrips = Math.max(trips, state.beTrips + MIN_TRIP_GAP);
   }
 
-  // Re-clamp after propagation
-  verts.perTrip.y = Math.max(TOP + 5, verts.perTrip.y);
-  verts.unlimited.y = Math.min(BOTTOM - 5, verts.unlimited.y);
+  // Clamp to valid range
+  state.beTrips = Math.max(1, Math.min(MAX_TRIPS - MIN_TRIP_GAP - 1, state.beTrips));
+  state.capTrips = Math.max(state.beTrips + MIN_TRIP_GAP, Math.min(MAX_TRIPS - 1, state.capTrips));
 
   updateGraph();
 }
