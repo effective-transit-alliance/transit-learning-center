@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="900" height="640" style="background-color: var(--bg-color)">
+  <style>
+    :root {
+      --bg-color: white;
+      --fg-color: #1a1a2e;
+      --muted-color: #555;
+      --guide-color: #e8e8e8;
+      --legend-bg: #f8fafc;
+      --legend-border: #e2e8f0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #1a1a1a;
+        --fg-color: #e0e0e0;
+        --muted-color: #999;
+        --guide-color: #333;
+        --legend-bg: #252525;
+        --legend-border: #444;
+      }
+    }
+    .title { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 17px; font-weight: bold; fill: var(--fg-color); }
+    .subtitle { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 11.5px; fill: var(--muted-color); font-style: italic; }
+    .axis-label { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 14px; fill: var(--fg-color); }
+    .tick-label { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 12px; fill: var(--muted-color); }
+    .region-label { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 12px; font-weight: 600; }
+    .region-sub { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 11px; }
+    .annotation { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 10.5px; font-style: italic; }
+    .value-label { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 11px; font-weight: 600; }
+    .legend-text { font-family: Arial, "TeX Gyre Heros", sans-serif; font-size: 12px; fill: var(--muted-color); }
+    .legend-bg { fill: var(--legend-bg); stroke: var(--legend-border); }
+    .axis { stroke: var(--fg-color); }
+    .axis-arrow { fill: var(--fg-color); }
+    .grid { stroke: var(--guide-color); }
+    .vertex { cursor: grab; touch-action: none; }
+    .vertex:active { cursor: grabbing; }
+  </style>
+
+  <script><![CDATA[
+@@SCRIPT@@
+  ]]></script>
+</svg>
