@@ -201,6 +201,13 @@ function buildDistChart(opts: {
       { cls: 'tick-label', anchor: 'middle' }));
   }
 
+  // Axis labels
+  g.appendChild(createText((LEFT + RIGHT) / 2, bottom + 42,
+    'Trips per Month', { cls: 'axis-label', anchor: 'middle' }));
+  const yAxisLabel = createText(0, 0, 'Rides', { cls: 'axis-label' });
+  yAxisLabel.setAttribute('transform', `translate(50,${(top + bottom) / 2 + 15}) rotate(-90)`);
+  g.appendChild(yAxisLabel);
+
   // Stacked areas + curve
   g.appendChild(createPolygon('0,0', { fill: COLORS.perTrip, opacity: 0.35, id: `${prefix}Grey` }));
   g.appendChild(createPolygon('0,0', { fill: color, opacity: 0.35, id: `${prefix}Color` }));
@@ -333,10 +340,6 @@ svg.appendChild(buildDistChart({
   color: COLORS.unlimited, colorDark: COLORS.unlimitedDark,
 }));
 
-// Shared Y-axis label spanning both distribution charts
-const passLabel = createText(0, 0, 'Rides', { cls: 'axis-label' });
-passLabel.setAttribute('transform', `translate(50,${(TOP2 + BOTTOM3) / 2 + 30}) rotate(-90)`);
-svg.appendChild(passLabel);
 
 // ============== State ==============
 const state = {
