@@ -1,2 +1,5 @@
 result
 result-*
+model/.lake/
+model/build/
+model/lake-packages/

@@ -94,5 +94,11 @@
           default = svg;
         }
       );
+
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = [ pkgs.elan ];
+        };
+      });
     };
 }
