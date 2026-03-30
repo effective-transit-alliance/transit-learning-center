@@ -122,7 +122,7 @@ class MakeFarePolicy (α : Type) where
 -- ============== Floor Arithmetic ==============
 
 /-- `fare * ⌊budget / fare⌋ ≤ budget` -/
-private theorem mul_floor_le {fare budget : Dollars} (hfare : 0 < fare) (hbudget : 0 < budget) :
+theorem mul_floor_le {fare budget : Dollars} (hfare : 0 < fare) (hbudget : 0 < budget) :
     fare * ↑(Nat.floor (budget / fare)) ≤ budget := by
   calc fare * ↑(Nat.floor (budget / fare))
       ≤ fare * (budget / fare) :=
@@ -132,7 +132,7 @@ private theorem mul_floor_le {fare budget : Dollars} (hfare : 0 < fare) (hbudget
     _ = budget := by field_simp [ne_of_gt hfare]
 
 /-- If `fare * m ≤ budget` then `m ≤ ⌊budget / fare⌋`. -/
-private theorem le_floor_of_mul_le {fare budget : Dollars} (hfare : 0 < fare) (hbudget : 0 < budget)
+theorem le_floor_of_mul_le {fare budget : Dollars} (hfare : 0 < fare) (hbudget : 0 < budget)
     {m : NumTrips} (h : fare * ↑m ≤ budget) : m ≤ Nat.floor (budget / fare) := by
   rw [Nat.le_floor_iff (div_nonneg (le_of_lt hbudget) (le_of_lt hfare))]
   rw [le_div_iff₀ hfare]

@@ -15,10 +15,6 @@ const TITLE2_Y = 650, TOP2 = 672, BOTTOM2 = TOP2 + DIST_HEIGHT;
 const TITLE3_Y = 930, TOP3 = 952, BOTTOM3 = TOP3 + DIST_HEIGHT;
 
 // Distribution parameters
-const DIST_SIGMA = 0.8;       // log-normal shape (higher = more right-skew)
-const SIGMOID_K = 0.3;        // adoption/threshold steepness
-const TAIL_SLOWDOWN = 0.5;    // power exponent for tail decay past 0-marginal-cost threshold (lower = fatter tail)
-const DEMAND_BOOST = 0.5;     // max extra ridership from zero marginal cost fares (price elasticity)
 
 const COLORS = {
   perTrip:       '#94a3b8',
@@ -42,16 +38,34 @@ function projectToTrips(mx: number, my: number): number {
 }
 
 // ============== Distribution Math ==============
-function riderPDF(x: number, mean: number): number {
-  if (x <= 0.5) return 0;
-  const mu = Math.log(mean) - DIST_SIGMA * DIST_SIGMA / 2;
-  return Math.exp(-0.5 * ((Math.log(x) - mu) / DIST_SIGMA) ** 2) /
-    (x * DIST_SIGMA * Math.sqrt(2 * Math.PI));
+
+// Normal CDF via error function approximation (Abramowitz & Stegun 7.1.26)
+function normalCDF(x: number, mu: number, sigma: number): number {
+  const z = (x - mu) / sigma;
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989422804014327; // 1/sqrt(2π)
+  const p = d * Math.exp(-0.5 * z * z) *
+    (t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429)))));
+  return z >= 0 ? 1 - p : p;
 }
 
-function sigmoid(x: number, center: number): number {
-  return 1 / (1 + Math.exp(-SIGMOID_K * (x - center)));
+// Fare cap histogram weight (matches Lean `histWeight`):
+//   riders(n) = mf(n) * (1 - cmf(min(q*n, C))) + surv(n) * max(0, cmf(min(q*(n+1), C)) - cmf(q*n))
+// where mf/surv come from a normal on maxTrips, cmf from a normal on budget.
+function histWeight(
+  n: number, fare: number, cap: number,
+  tripsMu: number, tripsSigma: number,
+  budgetMu: number, budgetSigma: number,
+): number {
+  // maxTrips mass/survival (continuous normal — no discretization)
+  const mf = normalCDF(n + 0.5, tripsMu, tripsSigma) - normalCDF(n - 0.5, tripsMu, tripsSigma);
+  const surv = 1 - normalCDF(n + 0.5, tripsMu, tripsSigma);
+  // budget cumulative mass
+  const cmf = (x: number) => normalCDF(x, budgetMu, budgetSigma);
+  return mf * (1 - cmf(Math.min(fare * n, cap))) +
+    surv * Math.max(0, cmf(Math.min(fare * (n + 1), cap)) - cmf(fare * n));
 }
+
 
 // ============== SVG Helpers ==============
 function createLine(
@@ -320,7 +334,7 @@ svg.appendChild(buildDistChart({
 }));
 
 // Shared Y-axis label spanning both distribution charts
-const passLabel = createText(0, 0, 'Passengers', { cls: 'axis-label' });
+const passLabel = createText(0, 0, 'Rides', { cls: 'axis-label' });
 passLabel.setAttribute('transform', `translate(50,${(TOP2 + BOTTOM3) / 2 + 30}) rotate(-90)`);
 svg.appendChild(passLabel);
 
@@ -446,62 +460,73 @@ function updateGraph(): void {
   // 5. Changing either policy slider should not affect the other
   //    ridership graph.
 
-  const distMean = state.distMode * Math.exp(DIST_SIGMA * DIST_SIGMA);
-  const N = 300;
-  const step = MAX_TRIPS / N;
+  // Distribution parameters: maxTrips ~ Normal(tripsMu, tripsSigma),
+  // budget ~ Normal(budgetMu, budgetSigma), conditioned on budget ≥ fare * workTrips.
+  // Budget is the binding constraint for most riders (more time than money).
+  const tripsMu = state.distMode * 2;  // riders generally want more trips than they can afford
+  const tripsSigma = 20;
+  const budgetMu = state.distMode * FARE;  // budget affords ~distMode trips under PPR
+  const budgetSigma = 25;
 
-  // Density at thresholds (for continuous kink model — 0 marginal cost → fatter tail)
-  const gAtCap = riderPDF(capTrips, distMean);
-  const gAtBe = riderPDF(beTrips, distMean);
+  const N = MAX_TRIPS;  // one sample per integer trip count
 
-  // Lower thresholds → cheaper transit → more total riders (price elasticity)
-  const fcScale = 1 + DEMAND_BOOST * (1 - capTrips / MAX_TRIPS);
-  const ulScale = 1 + DEMAND_BOOST * (1 - beTrips / MAX_TRIPS);
-
+  // Chart 2: Fare cap — closed-form histWeight from Lean model.
+  // Grey = budget-bound (paying per trip), Green = cap-covered (0 marginal cost).
+  // A rider is cap-covered when budget ≥ cap, which is captured by the
+  // histWeight formula automatically — but for coloring we split:
+  //   grey(n) = riders whose budget < cap and take n trips
+  //   color(n) = riders whose budget ≥ cap and take n trips (only possible when M = n)
   const fcGrey: number[] = [];
   const fcColor: number[] = [];
+
+  // Chart 3: Unlimited pass — riders choose PPR vs pass based on expected trips.
+  // Sharp per-rider decision convolved with perturbation kernel gives smooth
+  // population-level purchase probability: Φ((n - beTrips) / σ_perturbation).
+  // See PrepaidPassAnalysis.lean "Smooth transition (perturbation model)".
+  //
+  // Three components at each trip count n:
+  //   PPR riders (b < P): staircase truncated at b* = P
+  //   Pass holders (b ≥ P): take M trips → mf(n) * (1 - cmf(P))
+  //   Color split: smoothed by perturbation-derived purchase probability
+  const perturbationSigma = 5;  // trip uncertainty from perturbation kernel
   const ulGrey: number[] = [];
   const ulColor: number[] = [];
 
   let peakDensity = 0;
 
-  for (let i = 0; i <= N; i++) {
-    const t = i * step;
-    const g = riderPDF(t, distMean);
-
-    // Chart 2: Fare cap — hard color cutoff, continuous curve with kink.
-    // Below cap: grey (per-trip). Above cap: green (maxed out, 0 marginal cost).
-    // On the declining tail (g < gAtCap): power-law slowdown gAtCap × (g/gAtCap)^α
-    //   → continuous at capTrips, non-differentiable (kink), fatter than base.
-    // On the rising side (g >= gAtCap): just use base density g
-    //   → never suppress riders below the base distribution.
-    if (t <= capTrips) {
-      fcGrey.push(g * fcScale);
+  for (let n = 0; n <= N; n++) {
+    // Chart 2: histWeight gives total riders at trip count n.
+    // Vertical split at capTrips: below = grey (per-trip), above = green (capped).
+    // This is exact: for n > capTrips, fare*n > cap so only cap-covered riders remain.
+    // Multiply by n: Y axis is rides (n * riders(n)), so area = total ridership.
+    const h = n * histWeight(n, FARE, fareCapAmt, tripsMu, tripsSigma, budgetMu, budgetSigma);
+    if (n <= capTrips) {
+      fcGrey.push(h);
       fcColor.push(0);
     } else {
       fcGrey.push(0);
-      if (gAtCap > 1e-10 && g < gAtCap) {
-        const ratio = g / gAtCap;
-        fcColor.push(gAtCap * Math.pow(ratio, TAIL_SLOWDOWN) * fcScale);
-      } else {
-        fcColor.push(g * fcScale);
-      }
+      fcColor.push(h);
     }
 
-    // Chart 3: Unlimited pass — smooth sigmoid transition at beTrips.
-    // Pass holders face 0 marginal cost → same power-law tail slowdown as fare cap.
-    const pUl = sigmoid(t, beTrips);
-    ulGrey.push(g * (1 - pUl) * ulScale);
-    let gPassHolder = g;
-    if (t > beTrips && gAtBe > 1e-10 && g < gAtBe) {
-      const ratio = g / gAtBe;
-      gPassHolder = gAtBe * Math.pow(ratio, TAIL_SLOWDOWN);
-    }
-    ulColor.push(gPassHolder * pUl * ulScale);
+    // Chart 3: Unlimited pass — sharp model for totals, smooth color split.
+    // PPR riders (b < P): staircase truncated at P.
+    // Pass holders (b ≥ P): take M trips → mf(n) * (1 - cmf(P)).
+    const mfN = normalCDF(n + 0.5, tripsMu, tripsSigma) - normalCDF(n - 0.5, tripsMu, tripsSigma);
+    const survN = 1 - normalCDF(n + 0.5, tripsMu, tripsSigma);
+    const cmf = (x: number) => normalCDF(x, budgetMu, budgetSigma);
+    const qn = FARE * n;
+    const pprTimeBound = mfN * Math.max(0, cmf(unlimitedP) - cmf(qn));
+    const pprBudgetBound = survN * Math.max(0, cmf(Math.min(FARE * (n + 1), unlimitedP)) - cmf(qn));
+    const passHolders = mfN * (1 - cmf(unlimitedP));
+    const hTotal = n * (pprTimeBound + pprBudgetBound + passHolders);
+    // Smooth color split: perturbation kernel blurs the sharp decision boundary
+    const passPurchaseProb = normalCDF(n, beTrips, perturbationSigma);
+    ulGrey.push(hTotal * (1 - passPurchaseProb));
+    ulColor.push(hTotal * passPurchaseProb);
 
     peakDensity = Math.max(peakDensity,
-      fcGrey[i] + fcColor[i],
-      ulGrey[i] + ulColor[i]);
+      fcGrey[n] + fcColor[n],
+      ulGrey[n] + ulColor[n]);
   }
 
   // Shared y-scale so both charts are directly comparable
@@ -509,43 +534,42 @@ function updateGraph(): void {
 
   // Build stacked area polygons and total curve
   function buildAreas(
-    grey: number[], color: number[], bottom: number,
+    grey: number[], color: number[], len: number, bottom: number,
     greyId: string, colorId: string, curveId: string
   ): void {
     let greyPts = `${LEFT},${bottom}`;
-    for (let i = 0; i <= N; i++) {
-      greyPts += ` ${tx(i * step)},${bottom - grey[i] * yScale}`;
+    for (let i = 0; i <= len; i++) {
+      greyPts += ` ${tx(i)},${bottom - grey[i] * yScale}`;
     }
     greyPts += ` ${RIGHT},${bottom}`;
     document.getElementById(greyId)!.setAttribute('points', greyPts);
 
     let colorPts = '';
-    for (let i = 0; i <= N; i++) {
-      colorPts += `${i > 0 ? ' ' : ''}${tx(i * step)},${bottom - grey[i] * yScale}`;
+    for (let i = 0; i <= len; i++) {
+      colorPts += `${i > 0 ? ' ' : ''}${tx(i)},${bottom - grey[i] * yScale}`;
     }
-    for (let i = N; i >= 0; i--) {
-      colorPts += ` ${tx(i * step)},${bottom - (grey[i] + color[i]) * yScale}`;
+    for (let i = len; i >= 0; i--) {
+      colorPts += ` ${tx(i)},${bottom - (grey[i] + color[i]) * yScale}`;
     }
     document.getElementById(colorId)!.setAttribute('points', colorPts);
 
     let curvePts = '';
-    for (let i = 0; i <= N; i++) {
+    for (let i = 0; i <= len; i++) {
       if (i > 0) curvePts += ' ';
-      curvePts += `${tx(i * step)},${bottom - (grey[i] + color[i]) * yScale}`;
+      curvePts += `${tx(i)},${bottom - (grey[i] + color[i]) * yScale}`;
     }
     document.getElementById(curveId)!.setAttribute('points', curvePts);
   }
 
-  buildAreas(fcGrey, fcColor, BOTTOM2, 'c2Grey', 'c2Color', 'c2Curve');
-  buildAreas(ulGrey, ulColor, BOTTOM3, 'c3Grey', 'c3Color', 'c3Curve');
+  buildAreas(fcGrey, fcColor, N, BOTTOM2, 'c2Grey', 'c2Color', 'c2Curve');
+  buildAreas(ulGrey, ulColor, N, BOTTOM3, 'c3Grey', 'c3Color', 'c3Curve');
 
   // Guides
   setAttrs('c2Guide', { x1: capX, x2: capX });
   setAttrs('c3Guide', { x1: beX, x2: beX });
 
   // Mode dots — positioned at distMode on x-axis, on the total curve
-  const modeIdx = Math.round(state.distMode / step);
-  const clampedIdx = Math.max(0, Math.min(N, modeIdx));
+  const clampedIdx = Math.max(0, Math.min(N, Math.round(state.distMode)));
   setAttrs('c2MeanDot', {
     cx: tx(state.distMode),
     cy: BOTTOM2 - (fcGrey[clampedIdx] + fcColor[clampedIdx]) * yScale

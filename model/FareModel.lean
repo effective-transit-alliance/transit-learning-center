@@ -1,2 +1,4 @@
 import FareModel.Basic
 import FareModel.Distribution
+import FareModel.FareCapAnalysis
+import FareModel.PrepaidPassAnalysis

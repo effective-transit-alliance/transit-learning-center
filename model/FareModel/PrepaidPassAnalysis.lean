@@ -34,6 +34,32 @@ Two cases:
   `b* = q * ⌈P/q⌉` (the smallest budget where PPR trips hit the
   break-even count).
 
+### Smooth transition (perturbation model)
+
+The sharp crossover above applies to a single rider with known profile.
+In practice, riders decide based on their **expected** profile `e`, then
+experience **actual** profile `a ~ PerturbationKernel(e)`.
+
+A rider buys the pass when `P ≤ q * trips_ppr(e)`. But their actual
+trips may differ from `trips_ppr(e)`. This means:
+
+1. Monthly vs pay-per-ride is a choice. Riders will not exactly
+   transition around the break-even point, but will smoothly transition
+   because of uncertainty in advance about how many trips will be taken.
+
+2. Some riders buy the "wrong" pass — a pass holder who gets sick takes
+   fewer trips than expected (overpaid for the pass), while a PPR rider
+   who works overtime takes more trips than expected (would have saved
+   with the pass).
+
+At the population level, the sharp per-rider decision convolved with the
+perturbation kernel produces a smooth purchase probability:
+
+  `passPurchaseProb(n) = Φ((n - beTrips) / σ_perturbation)`
+
+where `σ_perturbation` is the perturbation kernel's effective width
+projected onto the trip-count axis.
+
 ### Population split
 
 For budget density `f` with CDF `F`:
@@ -68,6 +94,8 @@ All closed-form for standard densities.
 - [ ] `crossover_threshold`: define `b*` as a function of `q`, `P`, `w`, `M`.
 - [ ] `pass_iff`: prove a rider prefers pass iff `P ≤ q * trips_ppr(b)`.
 - [ ] `crossover_correct`: prove riders above `b*` prefer pass, below prefer PPR.
+- [ ] `smooth_crossover`: prove that convolving the sharp decision with
+      a Gaussian perturbation kernel yields a normal CDF purchase probability.
 - [ ] `combined_distribution`: prove the combined trip histogram formula.
 - [ ] `total_revenue_closed_form`: express aggregate revenue as a function
       of `q`, `P`, `F`, `w`, `M` — the formula TypeScript evaluates.
