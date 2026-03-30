@@ -1,14 +1,8 @@
 # Transit Fare Structures
 
-<!--
-
-Hidden because I didn't turn on GH pages for this scratch work
-
 ![Transit Fare Structures Screenshot](https://effective-transit-alliance.github.io/transit-learning-center/fare-structures.png)
 
 [**View Interactive Demo**](https://effective-transit-alliance.github.io/transit-learning-center/fare-structures.svg)
-
--->
 
 An interactive visualization comparing transit fare policies: pay-per-ride, fare capping, and prepaid unlimited passes.
 Drag the dots to explore different thresholds and see how ridership distributions change.
