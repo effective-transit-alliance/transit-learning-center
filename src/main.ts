@@ -326,8 +326,9 @@ lg.appendChild(createLine(455, 5, 482, 5, { stroke: COLORS.fareCap, width: 2.5 }
 lg.appendChild(createText(490, 9, '', { cls: 'legend-text', id: 'legFc' }));
 svg.appendChild(lg);
 
-// ============== Build Charts 2 & 3 ==============
+// ============== Build Charts 2 & 3 (disabled — ridership model not ready) ==============
 
+/* DISABLED: ridership model not ready
 svg.appendChild(buildDistChart({
   prefix: 'c2', title: 'With Fare Cap', titleY: TITLE2_Y,
   top: TOP2, bottom: BOTTOM2,
@@ -339,6 +340,7 @@ svg.appendChild(buildDistChart({
   top: TOP3, bottom: BOTTOM3,
   color: COLORS.unlimited, colorDark: COLORS.unlimitedDark,
 }));
+*/
 
 
 // ============== State ==============
@@ -437,9 +439,9 @@ function updateGraph(): void {
   setText('legUl', `Unlimited pass ($${Math.round(unlimitedP)}/mo)`);
   setText('legFc', `Fare cap ($${Math.round(fareCapAmt)}/mo)`);
 
-  // ---- Charts 2 & 3: Rider Distribution ----
+  // ---- Charts 2 & 3: Rider Distribution (disabled — model not ready) ----
   //
-  // Key invariants:
+  // Key invariants (to honor when re-enabling):
   //
   // 1. Both fare-capped riders past the threshold and unlimited pass
   //    holders (anywhere in the distribution) face 0 marginal cost, so
@@ -462,6 +464,8 @@ function updateGraph(): void {
   //
   // 5. Changing either policy slider should not affect the other
   //    ridership graph.
+
+  /* DISABLED: ridership model not ready
 
   // Distribution parameters: maxTrips ~ Normal(tripsMu, tripsSigma),
   // budget ~ Normal(budgetMu, budgetSigma), conditioned on budget ≥ fare * workTrips.
@@ -615,6 +619,8 @@ function updateGraph(): void {
     setText('c3ColorLabel', `${100 - ulGreyPct}% pass holders`, (beX + RIGHT) / 2, c3LabelY);
     setVis('c3ColorLabel', true);
   } else { setVis('c3ColorLabel', false); }
+
+  END DISABLED */
 }
 
 // ============== Drag Interaction ==============
@@ -640,17 +646,19 @@ function startDrag(key: DotKey): (evt: Event) => void {
 
 const beDotEl = document.getElementById('beDot')!;
 const capDotEl = document.getElementById('capDot')!;
-const c2MeanDotEl = document.getElementById('c2MeanDot')!;
-const c3MeanDotEl = document.getElementById('c3MeanDot')!;
 
 beDotEl.addEventListener('mousedown', startDrag('be'));
 beDotEl.addEventListener('touchstart', startDrag('be'), { passive: false });
 capDotEl.addEventListener('mousedown', startDrag('cap'));
 capDotEl.addEventListener('touchstart', startDrag('cap'), { passive: false });
+/* DISABLED: ridership model not ready
+const c2MeanDotEl = document.getElementById('c2MeanDot')!;
+const c3MeanDotEl = document.getElementById('c3MeanDot')!;
 c2MeanDotEl.addEventListener('mousedown', startDrag('mean'));
 c2MeanDotEl.addEventListener('touchstart', startDrag('mean'), { passive: false });
 c3MeanDotEl.addEventListener('mousedown', startDrag('mean'));
 c3MeanDotEl.addEventListener('touchstart', startDrag('mean'), { passive: false });
+*/
 
 function onMove(evt: MouseEvent | TouchEvent): void {
   if (!dragging) return;
@@ -666,10 +674,13 @@ function onMove(evt: MouseEvent | TouchEvent): void {
     }
     state.beTrips = Math.max(1, Math.min(MAX_TRIPS - 1, state.beTrips));
     state.capTrips = Math.max(1, Math.min(MAX_TRIPS - 1, state.capTrips));
+  }
+  /* DISABLED: ridership model not ready
   } else if (dragging === 'mean') {
     const trips = ((pos.x - LEFT) / WIDTH) * MAX_TRIPS;
     state.distMode = Math.max(2, Math.min(MAX_TRIPS * 0.7, trips));
   }
+  */
 
   updateGraph();
 }
