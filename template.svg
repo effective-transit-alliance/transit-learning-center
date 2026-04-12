@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1175" width="900" height="1175" style="background-color: var(--bg-color)">
+<!-- viewBox height was 1175 with Charts 2 & 3 enabled -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="900" height="640" style="background-color: var(--bg-color)">
   <style>
     :root {
       --bg-color: white;
