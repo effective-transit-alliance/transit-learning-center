@@ -289,8 +289,12 @@ chart1.appendChild(createLine(0, 0, 0, 0,
 
 chart1.appendChild(createCircle(0, 0, 7,
   { fill: COLORS.unlimited, stroke: 'white', sw: 2, id: 'beDot', cls: 'vertex' }));
+chart1.appendChild(createCircle(0, 0, 25,
+  { fill: 'transparent', id: 'beDotHit', cls: 'vertex' }));
 chart1.appendChild(createCircle(0, 0, 7,
   { fill: COLORS.fareCap, stroke: 'white', sw: 2, id: 'capDot', cls: 'vertex' }));
+chart1.appendChild(createCircle(0, 0, 25,
+  { fill: 'transparent', id: 'capDotHit', cls: 'vertex' }));
 
 chart1.appendChild(createText(0, 0, '', { cls: 'region-label', fill: COLORS.agencyDark, id: 'agLabel', anchor: 'middle' }));
 chart1.appendChild(createText(0, 0, '', { cls: 'region-label', id: 'stripLabel1', anchor: 'middle' }));
@@ -390,7 +394,9 @@ function updateGraph(): void {
   setAttrs('beGuide',  { x1: beX, x2: beX, y1: beY, y2: BOTTOM });
   setAttrs('capGuide', { x1: capX, x2: capX, y1: capY, y2: BOTTOM });
   setAttrs('beDot',  { cx: beX, cy: beY });
+  setAttrs('beDotHit',  { cx: beX, cy: beY });
   setAttrs('capDot', { cx: capX, cy: capY });
+  setAttrs('capDotHit', { cx: capX, cy: capY });
 
   setText('ulVal', '$' + Math.round(unlimitedP), RIGHT + 8, beY - 4);
   setText('fcVal', '$' + Math.round(fareCapAmt), RIGHT + 8, capY - 4);
@@ -644,13 +650,13 @@ function startDrag(key: DotKey): (evt: Event) => void {
   };
 }
 
-const beDotEl = document.getElementById('beDot')!;
-const capDotEl = document.getElementById('capDot')!;
+const beDotHitEl = document.getElementById('beDotHit')!;
+const capDotHitEl = document.getElementById('capDotHit')!;
 
-beDotEl.addEventListener('mousedown', startDrag('be'));
-beDotEl.addEventListener('touchstart', startDrag('be'), { passive: false });
-capDotEl.addEventListener('mousedown', startDrag('cap'));
-capDotEl.addEventListener('touchstart', startDrag('cap'), { passive: false });
+beDotHitEl.addEventListener('mousedown', startDrag('be'));
+beDotHitEl.addEventListener('touchstart', startDrag('be'), { passive: false });
+capDotHitEl.addEventListener('mousedown', startDrag('cap'));
+capDotHitEl.addEventListener('touchstart', startDrag('cap'), { passive: false });
 /* DISABLED: ridership model not ready
 const c2MeanDotEl = document.getElementById('c2MeanDot')!;
 const c3MeanDotEl = document.getElementById('c3MeanDot')!;
